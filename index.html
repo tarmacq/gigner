@@ -1,40 +1,493 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta property="og:title" content="tarmacq">
-  <meta property="og:description" content="Hi, I'm tarmacq.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tarmacq.github.io">
-  <meta property="og:image" content="https://ik.imagekit.io/hswtnwf8i/Untitled%20(33).png?updatedAt=1761329593382">
-  <meta property="og:site_name" content="tarmacq">
-    <title>tarmacq</title>
+    <title>tarmacq | Command Center</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" href="https://ik.imagekit.io/hswtnwf8i/Untitled%20(33).png?updatedAt=1761329593382" type="image/png" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0a0a0a;
-            color: #e0e0e0;
-            overflow-x: hidden;
+        :root {
+            --bg-dark: #013220;
+            --bg-darker: #001a11;
+            --primary-mint: #D1F2EB;
+            --accent-emerald: #50C878;
+            --accent-royal: #0B6E4F;
+            --glass-bg: rgba(1, 50, 32, 0.4);
+            --glass-border: rgba(209, 242, 235, 0.1);
         }
-        .text-accent {
-            color: #4f46e5;
+
+        body { 
+            font-family: 'Outfit', sans-serif; 
+            background-color: var(--bg-darker); 
+            color: var(--primary-mint);
+            overflow: hidden;
         }
-        .bg-card {
-            background-color: #1a1a2e;
-            border: 1px solid rgba(79, 70, 229, 0.2);
+
+        /* Advanced Glassmorphism */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
-        .section-heading {
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: var(--accent-emerald);
+            transform: translateY(-5px);
+        }
+
+        /* Sidebar & Navigation */
+        .nav-item {
             position: relative;
-            display: inline-block;
-            padding-bottom: 12px;
-            margin-bottom: 50px;
-            font-size: 2.5rem;
+            transition: all 0.3s ease;
+            color: rgba(209, 242, 235, 0.5);
+        }
+
+        .nav-item.active {
+            color: var(--accent-emerald);
+            background: rgba(80, 200, 120, 0.08);
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 20%;
+            height: 60%;
+            width: 4px;
+            background: var(--accent-emerald);
+            border-radius: 0 4px 4px 0;
+        }
+
+        /* Button Styling */
+        .btn-action {
+            background: linear-gradient(135deg, var(--accent-royal), var(--accent-emerald));
+            color: var(--bg-darker);
+            font-weight: 700;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(80, 200, 120, 0.2);
+        }
+
+        .btn-action:hover {
+            filter: brightness(1.1);
+            transform: scale(1.02);
+            box-shadow: 0 6px 20px rgba(80, 200, 120, 0.4);
+        }
+
+        /* View Switching Logic */
+        .view-content { display: none; opacity: 0; transform: translateY(20px); transition: all 0.5s ease; }
+        .view-content.active { display: block; opacity: 1; transform: translateY(0); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg-darker); }
+        ::-webkit-scrollbar-thumb { background: var(--accent-royal); border-radius: 10px; }
+
+        /* Animation for stats */
+        @keyframes countUp { from { opacity: 0; } to { opacity: 1; } }
+        .stat-value { animation: countUp 1s ease-out; }
+
+        #toast {
+            position: fixed; bottom: 2rem; right: 2rem;
+            transform: translateX(150%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+        }
+        #toast.show { transform: translateX(0); }
+    </style>
+</head>
+<body class="flex h-screen w-full">
+
+    <aside class="w-72 border-r border-white/5 flex flex-col p-8 glass-panel z-50">
+        <div class="flex items-center gap-4 mb-12">
+            <div class="relative">
+                <img src="https://www.tarmacq.com/Untitled%20(12).png" class="w-12 h-12 rounded-2xl rotate-3">
+                <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-bg-dark rounded-full"></div>
+            </div>
+            <div>
+                <h1 class="text-xl font-black tracking-tighter">tarmacq</h1>
+                <p class="text-[10px] uppercase tracking-widest text-emerald-500/80 font-bold">Identity Provider</p>
+            </div>
+        </div>
+
+        <nav class="space-y-2 flex-1">
+            <button onclick="navigate('overview')" id="btn-overview" class="nav-item active w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-semibold">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i> <span data-i18n="nav_overview">Overview</span>
+            </button>
+            <button onclick="navigate('security')" id="btn-security" class="nav-item w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-semibold">
+                <i data-lucide="shield-check" class="w-5 h-5"></i> <span data-i18n="nav_security">Security & Access</span>
+            </button>
+            <button onclick="navigate('ecosystem')" id="btn-ecosystem" class="nav-item w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-semibold">
+                <i data-lucide="layers" class="w-5 h-5"></i> <span data-i18n="nav_ecosystem">My Ecosystem</span>
+            </button>
+            <button onclick="navigate('settings')" id="btn-settings" class="nav-item w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-semibold">
+                <i data-lucide="settings" class="w-5 h-5"></i> <span data-i18n="nav_settings">Account Settings</span>
+            </button>
+        </nav>
+
+        <div class="mt-auto space-y-4">
+            <div class="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                <p class="text-[10px] text-gray-500 uppercase font-bold mb-1">Current Language</p>
+                <select onchange="changeLanguage(this.value)" id="langSelect" class="bg-transparent text-sm font-bold outline-none w-full text-emerald-400">
+                    <option value="en">English (US)</option>
+                    <option value="fr">Français (FR)</option>
+                    <option value="ar">العربية (AR)</option>
+                </select>
+            </div>
+            <button onclick="handleLogout()" class="w-full flex items-center gap-4 px-4 py-3 text-red-400 hover:bg-red-400/10 rounded-xl transition-all font-bold text-sm">
+                <i data-lucide="log-out" class="w-5 h-5"></i> <span data-i18n="logout">Sign Out</span>
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative overflow-hidden">
+        
+        <header class="h-24 px-10 border-b border-white/5 flex items-center justify-between z-40 bg-evergreen/10 backdrop-blur-xl">
+            <div class="flex flex-col">
+                <h2 id="view-title" class="text-2xl font-bold">Overview</h2>
+                <p id="view-subtitle" class="text-xs text-gray-500 uppercase tracking-widest font-bold">System Status: Optimal</p>
+            </div>
+
+            <div class="flex items-center gap-6">
+                <div class="flex flex-col text-right">
+                    <p id="user-display-name" class="font-bold text-sm">---</p>
+                    <p id="user-display-email" class="text-[10px] text-emerald-500/60 uppercase font-black">---</p>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-royal flex items-center justify-center border border-white/10 shadow-xl" id="user-pfp">
+                    <span class="text-xl font-black text-bg-darker">?</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-10 relative">
+            
+            <section id="view-overview" class="view-content active space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass-card p-6 rounded-3xl">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500"><i data-lucide="zap"></i></div>
+                            <span class="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full uppercase">Live</span>
+                        </div>
+                        <h4 class="text-gray-400 text-xs font-bold uppercase tracking-widest">Active Services</h4>
+                        <p class="text-4xl font-black mt-1 stat-value">04</p>
+                    </div>
+                    <div class="glass-card p-6 rounded-3xl">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-blue-500/10 rounded-2xl text-blue-500"><i data-lucide="shield"></i></div>
+                        </div>
+                        <h4 class="text-gray-400 text-xs font-bold uppercase tracking-widest">Security Score</h4>
+                        <p class="text-4xl font-black mt-1 stat-value">98<span class="text-sm text-gray-500">%</span></p>
+                    </div>
+                    <div class="glass-card p-6 rounded-3xl">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-royal/20 rounded-2xl text-emerald-400"><i data-lucide="clock"></i></div>
+                        </div>
+                        <h4 class="text-gray-400 text-xs font-bold uppercase tracking-widest">Uptime Identity</h4>
+                        <p class="text-4xl font-black mt-1 stat-value">99.9</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 glass-panel p-8 rounded-[2rem]">
+                        <h3 class="text-lg font-bold mb-6">Login Activity <span class="text-xs font-normal text-gray-500">(Last 7 Days)</span></h3>
+                        <canvas id="activityChart" height="150"></canvas>
+                    </div>
+                    <div class="glass-panel p-8 rounded-[2rem]">
+                        <h3 class="text-lg font-bold mb-6">Device Auth</h3>
+                        <div class="space-y-4" id="recent-logins">
+                            </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-security" class="view-content space-y-8">
+                <div class="max-w-3xl space-y-6">
+                    <div class="glass-panel p-8 rounded-[2rem]">
+                        <h3 class="text-xl font-bold mb-6 flex items-center gap-3">
+                            <i data-lucide="lock" class="text-emerald-500"></i> Authentication Update
+                        </h3>
+                        <form onsubmit="updatePassword(event)" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input type="password" id="sec-pass" placeholder="New Password" class="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-emerald-500 transition-all">
+                                <input type="password" id="sec-pass-confirm" placeholder="Confirm Password" class="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-emerald-500 transition-all">
+                            </div>
+                            <button type="submit" class="btn-action px-8 py-4 rounded-2xl text-sm">Update Credentials</button>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel p-8 rounded-[2rem]">
+                        <h3 class="text-xl font-bold mb-2 flex items-center gap-3">
+                            <i data-lucide="fingerprint" class="text-emerald-500"></i> Multi-Factor (MFA)
+                        </h3>
+                        <p class="text-sm text-gray-500 mb-6">Add an extra layer of security to your tarmacq account using TOTP.</p>
+                        <button class="px-6 py-3 border border-white/10 rounded-xl text-sm font-bold hover:bg-white/5 transition-all">Configure Authenticator App</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-ecosystem" class="view-content space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="ecosystem-grid">
+                    </div>
+            </section>
+
+            <section id="view-settings" class="view-content space-y-8">
+                <div class="glass-panel p-8 rounded-[2rem] max-w-2xl">
+                    <h3 class="text-xl font-bold mb-8">Identity Profile</h3>
+                    <div class="space-y-6">
+                        <div class="flex items-center gap-6 pb-6 border-b border-white/5">
+                            <div class="w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-3xl font-black text-emerald-500" id="settings-pfp">?</div>
+                            <button class="text-xs font-bold uppercase tracking-widest text-emerald-500 hover:underline">Change Avatar</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <label class="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Full Name</label>
+                                <input type="text" id="set-name" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Email (Primary)</label>
+                                <input type="email" id="set-email" disabled class="w-full bg-white/5 border border-white/10 p-4 rounded-xl opacity-50 cursor-not-allowed">
+                            </div>
+                        </div>
+                        <button onclick="updateProfile()" class="btn-action px-8 py-4 rounded-2xl text-sm w-full md:w-auto">Save Profile Changes</button>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <div id="toast" class="glass-panel px-6 py-4 rounded-2xl border-emerald-500/50 flex items-center gap-4">
+        <div id="toast-icon" class="text-emerald-500"></div>
+        <p id="toast-msg" class="text-sm font-bold"></p>
+    </div>
+
+    <script>
+        // --- CONFIGURATION (FROM YOUR INDEX.HTML) ---
+        const SUPABASE_URL = 'https://ulhwmqhxppuhqtoujmum.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'sb_publishable_F0QWv6J1ienKfeJSmHPX8Q_BcSVNQX3';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let currentLang = localStorage.getItem('tarmacq_lang') || 'en';
+
+        const i18n = {
+            en: {
+                nav_overview: "Overview",
+                nav_security: "Security & Access",
+                nav_ecosystem: "My Ecosystem",
+                nav_settings: "Account Settings",
+                logout: "Sign Out",
+                msg_updated: "Identity Updated Successfully",
+                msg_error: "System Error: Action Failed"
+            },
+            fr: {
+                nav_overview: "Aperçu",
+                nav_security: "Sécurité & Accès",
+                nav_ecosystem: "Mon Écosystème",
+                nav_settings: "Paramètres",
+                logout: "Déconnexion",
+                msg_updated: "Identité mise à jour avec succès",
+                msg_error: "Erreur système : Échec de l'action"
+            }
+        };
+
+        // --- CORE LOGIC ---
+
+        async function init() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) return window.location.href = 'index.html';
+
+            currentUser = session.user;
+            updateUIStrings();
+            populateUserData();
+            initChart();
+            loadRecentSessions();
+            loadEcosystem();
+            
+            lucide.createIcons();
+        }
+
+        function populateUserData() {
+            const name = currentUser.user_metadata?.full_name || currentUser.email.split('@')[0];
+            const initial = name.charAt(0).toUpperCase();
+
+            document.getElementById('user-display-name').innerText = name;
+            document.getElementById('user-display-email').innerText = currentUser.email;
+            document.getElementById('user-pfp').innerHTML = `<span class="text-xl font-black text-bg-darker">${initial}</span>`;
+            
+            // Settings form
+            document.getElementById('set-name').value = name;
+            document.getElementById('set-email').value = currentUser.email;
+            document.getElementById('settings-pfp').innerText = initial;
+        }
+
+        function navigate(view) {
+            // Update Active Class on Buttons
+            document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${view}`).classList.add('active');
+
+            // Switch Visibility
+            document.querySelectorAll('.view-content').forEach(sect => sect.classList.remove('active'));
+            document.getElementById(`view-${view}`).classList.add('active');
+
+            // Header Update
+            document.getElementById('view-title').innerText = i18n[currentLang][`nav_${view}`];
+            lucide.createIcons();
+        }
+
+        async function updateProfile() {
+            const newName = document.getElementById('set-name').value;
+            const { error } = await supabaseClient.auth.updateUser({
+                data: { full_name: newName }
+            });
+
+            if (error) showToast(error.message, 'error');
+            else {
+                showToast(i18n[currentLang].msg_updated, 'success');
+                // Refresh local data
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                currentUser = user;
+                populateUserData();
+            }
+        }
+
+        async function updatePassword(e) {
+            e.preventDefault();
+            const p1 = document.getElementById('sec-pass').value;
+            const p2 = document.getElementById('sec-pass-confirm').value;
+
+            if (p1 !== p2) return showToast("Passwords do not match", "error");
+
+            const { error } = await supabaseClient.auth.updateUser({ password: p1 });
+            if (error) showToast(error.message, 'error');
+            else {
+                showToast("Password Securely Updated", "success");
+                e.target.reset();
+            }
+        }
+
+        function loadRecentSessions() {
+            const container = document.getElementById('recent-logins');
+            const sessions = [
+                { device: 'Current Browser', os: 'Desktop', time: 'Active Now', icon: 'monitor' },
+                { device: 'Mobile App', os: 'iOS 17', time: '2 hours ago', icon: 'smartphone' }
+            ];
+
+            container.innerHTML = sessions.map(s => `
+                <div class="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <div class="text-emerald-500"><i data-lucide="${s.icon}" class="w-5 h-5"></i></div>
+                    <div class="flex-1">
+                        <p class="text-xs font-bold">${s.device}</p>
+                        <p class="text-[10px] text-gray-500 uppercase font-bold">${s.os} • ${s.time}</p>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function loadEcosystem() {
+            const apps = [
+                { name: 'tarmacq Cloud', url: 'cloud.tarmacq.com', status: 'Authorized', icon: 'cloud' },
+                { name: 'tarmacq Dev', url: 'dev.tarmacq.com', status: 'Developer', icon: 'code' },
+                { name: 'tarmacq Hub', url: 'hub.tarmacq.com', status: 'Authorized', icon: 'command' }
+            ];
+
+            document.getElementById('ecosystem-grid').innerHTML = apps.map(app => `
+                <div class="glass-card p-6 rounded-[2rem] relative group overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-100 transition-opacity">
+                        <i data-lucide="external-link" class="w-4 h-4 cursor-pointer"></i>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-4">
+                        <i data-lucide="${app.icon}"></i>
+                    </div>
+                    <h4 class="font-bold text-lg">${app.name}</h4>
+                    <p class="text-xs text-gray-500 mb-4">${app.url}</p>
+                    <span class="text-[10px] font-black uppercase tracking-widest px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-full">
+                        ${app.status}
+                    </span>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('activityChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Sessions',
+                        data: [2, 5, 3, 8, 4, 1, 6],
+                        borderColor: '#50C878',
+                        backgroundColor: 'rgba(80, 200, 120, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 3,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { grid: { display: false }, border: { display: false }, ticks: { color: '#0B6E4F', font: { weight: 'bold' } } }
+                    }
+                }
+            });
+        }
+
+        // --- UTILS ---
+
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            document.getElementById('toast-msg').innerText = msg;
+            
+            icon.innerHTML = type === 'success' ? '<i data-lucide="check-circle"></i>' : '<i data-lucide="alert-circle"></i>';
+            icon.className = type === 'success' ? 'text-emerald-500' : 'text-red-500';
+            
+            t.classList.add('show');
+            lucide.createIcons();
+            setTimeout(() => t.classList.remove('show'), 4000);
+        }
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('tarmacq_lang', lang);
+            updateUIStrings();
+            navigate('overview'); // Refresh header title
+        }
+
+        function updateUIStrings() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[currentLang][key]) el.innerText = i18n[currentLang][key];
+            });
+        }
+
+        async function handleLogout() {
+            await supabaseClient.auth.signOut();
+            window.location.href = 'index.html';
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>            font-size: 2.5rem;
             letter-spacing: 1px;
             background: linear-gradient(90deg, #4f46e5, #ec4899);
             -webkit-background-clip: text;
